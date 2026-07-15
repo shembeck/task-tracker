@@ -477,7 +477,7 @@ export default function TrackerApp() {
 
         <div className="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)]/70 p-5 shadow-[var(--shadow)]">
           <p className="font-sans text-3xl leading-none tracking-tight">
-            {weekKind === "current" ? "This Weeks Tasks" : "That Weeks Tasks"}
+            {weekKind === "current" ? "This Week's Tasks" : "That Week's Tasks"}
           </p>
           <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
             <div>
