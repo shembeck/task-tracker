@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  tasks     Task[]
+}
+
+/// status: active | complete | obsolete
+/// weekStart: ISO date (YYYY-MM-DD) for the Monday of that week
+model Task {
+  id         String     @id @default(cuid())
+  title      String
+  notes      String     @default("")
+  status     String     @default("active")
+  weekStart  String
+  rolledFrom String?
+  memberId   String
+  member     TeamMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([weekStart])
+  @@index([memberId, weekStart])
+}
