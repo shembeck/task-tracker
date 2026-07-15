@@ -39,7 +39,7 @@ export default function LoginPage() {
     <main className="min-h-screen flex items-center justify-center px-4">
       <form
         onSubmit={onSubmit}
-        className="w-full max-w-sm rounded-2xl border border-[var(--line)] bg-white/80 p-8 shadow-[var(--shadow)] backdrop-blur"
+        className="w-full max-w-sm rounded-2xl border border-[var(--line)] bg-[var(--surface)]/80 p-8 shadow-[var(--shadow)] backdrop-blur"
       >
         <p className="font-sans text-3xl tracking-tight text-[var(--ink)]">
           Weekly Tasks
@@ -54,7 +54,7 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoFocus
-            className="mt-2 w-full rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 py-2.5 outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+            className="mt-2 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-2.5 outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30"
           />
         </label>
         {error ? (

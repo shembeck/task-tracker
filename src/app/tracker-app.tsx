@@ -240,7 +240,7 @@ export default function TrackerApp() {
 
   return (
     <>
-      <nav className="sticky top-0 z-20 bg-[var(--accent)]">
+      <nav className="sticky top-0 z-20 bg-[var(--accent-deep)]">
         <div
           className="flex items-center justify-between"
           style={{ height: "80px", paddingLeft: "60px", paddingRight: "60px" }}
@@ -278,15 +278,10 @@ export default function TrackerApp() {
       </nav>
 
       <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-        <header className="border-b border-[var(--line)] pb-6">
-          <p className="text-sm text-[var(--ink-muted)]">
-            Shared status by week · incomplete work rolls forward automatically
-          </p>
-        </header>
 
       {error ? (
         <p
-          className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--danger)]"
+          className="mt-4 rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2 text-sm text-[var(--danger)]"
           role="alert"
         >
           {error}
@@ -294,8 +289,8 @@ export default function TrackerApp() {
       ) : null}
 
       <section className="mt-8 space-y-6">
-        <div className="w-full rounded-2xl border border-[var(--line)] bg-white/70 p-5 shadow-[var(--shadow)]">
-          <h2 className="font-sans text-xl">Add task</h2>
+        <div className="w-full rounded-2xl bg-[var(--surface)]/30 p-5 shadow-[var(--shadow)]">
+          <h2 className="font-sans text-xl">Add a task</h2>
           <p
             className={`mt-3 text-sm ${
               !memberId && showSelectHint
@@ -320,7 +315,7 @@ export default function TrackerApp() {
                   className={`rounded-full px-3 py-1 text-sm transition ${
                     selected
                       ? "bg-[var(--accent)] font-medium text-white"
-                      : "bg-[var(--paper-2)] text-[var(--ink)] hover:bg-[var(--line)]"
+                      : "bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--line)]"
                   }`}
                 >
                   {m.name}
@@ -345,7 +340,7 @@ export default function TrackerApp() {
                 <button
                   type="submit"
                   disabled={addingMember || !newMemberName.trim()}
-                  className="rounded-full bg-[var(--ink)] px-3 py-1 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  className="rounded-full bg-[var(--accent)] px-3 py-1 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
                 >
                   {addingMember ? "Adding…" : "Add"}
                 </button>
@@ -412,17 +407,26 @@ export default function TrackerApp() {
                           );
                         }}
                         placeholder="Enter a task for this week"
-                        style={{ fontSize: "18px" }}
-                        className="w-full rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-11 w-full rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                       />
                       <button
                         type="submit"
                         disabled={saving || !memberId || !hasTaskTitle}
-                        aria-label="Add task"
-                        title="Add task"
-                        className="flex shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] px-4 py-2 text-2xl leading-none text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
+                        aria-label="Add a task"
+                        title="Add a task"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
                       >
-                        +
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={3.5}
+                          strokeLinecap="round"
+                          className="h-5 w-5"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
                       </button>
                       {!memberId ? (
                         <button
@@ -452,8 +456,7 @@ export default function TrackerApp() {
                         }}
                         placeholder="Notes (optional)"
                         rows={2}
-                        style={{ fontSize: "18px" }}
-                        className="w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                       />
                     ) : (
                       <button
@@ -472,8 +475,8 @@ export default function TrackerApp() {
           </div>
         </div>
 
-        <div className="w-full rounded-2xl border border-[var(--line)] bg-white/70 p-5 shadow-[var(--shadow)]">
-          <p className="font-sans text-4xl leading-none tracking-tight">
+        <div className="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)]/70 p-5 shadow-[var(--shadow)]">
+          <p className="font-sans text-3xl leading-none tracking-tight">
             {weekKind === "current" ? "This Weeks Tasks" : "That Weeks Tasks"}
           </p>
           <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
@@ -487,7 +490,7 @@ export default function TrackerApp() {
                     setShowWeekPicker(false);
                   }}
                   onBlur={() => setShowWeekPicker(false)}
-                  className="mt-0.5 rounded-lg border border-[var(--line)] bg-white px-2 py-1 text-sm text-[var(--ink)]"
+                  className="mt-0.5 rounded-lg border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-1 text-sm text-[var(--ink)]"
                 >
                   {weeks.map((w) => (
                     <option key={w.weekStart} value={w.weekStart}>
@@ -517,7 +520,7 @@ export default function TrackerApp() {
                       paddingLeft: "4px",
                       borderRadius: "100px",
                     }}
-                    className="inline-flex items-center justify-center bg-[var(--paper-2)] font-bold uppercase tracking-wide text-[var(--ink-light)]"
+                    className="inline-flex items-center justify-center bg-[var(--surface-strong)] font-bold uppercase tracking-wide text-[var(--ink-muted)]"
                   >
                     {weekKind === "past"
                       ? "Past"
@@ -568,13 +571,13 @@ export default function TrackerApp() {
                               <input
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
-                                className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
+                                className="w-full rounded-lg border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-2"
                               />
                               <textarea
                                 value={editNotes}
                                 onChange={(e) => setEditNotes(e.target.value)}
                                 rows={2}
-                                className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
+                                className="w-full rounded-lg border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-2"
                               />
                               <div className="flex gap-2">
                                 <button
@@ -602,19 +605,20 @@ export default function TrackerApp() {
                             <div
                               className={`relative overflow-hidden rounded-lg border px-2 py-1 ${
                                 task.status === "complete"
-                                  ? "border-transparent"
-                                  : "border-[var(--line)] hover:bg-[var(--paper)]/60"
+                                  ? "border-transparent bg-[var(--paper)]/50"
+                                  : "border-[var(--line)] bg-[var(--paper)]/50 hover:bg-[var(--surface-strong)]/60"
                               }`}
                             >
                               <div className="flex gap-3">
                                 <div className="min-w-0 flex-1">
                                   <p
-                                    style={{ fontSize: "10px", lineHeight: 1 }}
-                                    className="pt-1 font-bold uppercase tracking-wider text-[var(--ink-light)]"
+                                    style={{ fontSize: "11px", lineHeight: 1 }}
+                                    className="pt-1 font-bold uppercase tracking-wider text-[var(--ink-muted)]"
                                   >
                                     Task
                                   </p>
                                   <p
+                                    style={{ paddingLeft: "4px" }}
                                     className={`mt-1 text-sm leading-snug ${
                                       task.status === "complete"
                                         ? "text-[var(--ink-muted)] line-through"
@@ -626,7 +630,10 @@ export default function TrackerApp() {
                                     {task.title}
                                   </p>
                                   {task.notes ? (
-                                    <p className="mt-1 text-xs leading-relaxed text-[var(--ink-muted)] whitespace-pre-wrap">
+                                    <p
+                                      style={{ paddingLeft: "4px" }}
+                                      className="mt-1 text-xs leading-relaxed text-[var(--ink-muted)] whitespace-pre-wrap"
+                                    >
                                       {task.notes}
                                     </p>
                                   ) : null}
@@ -702,7 +709,11 @@ export default function TrackerApp() {
                                             ? "opacity-0 group-hover:opacity-100 focus:opacity-100"
                                             : ""
                                         }`}
-                                        style={{ fontWeight: 500 }}
+                                        style={{
+                                          fontWeight: 500,
+                                          paddingBottom: "2px",
+                                          paddingRight: "2px",
+                                        }}
                                       >
                                         {task.status === "complete"
                                           ? "Mark incomplete"
@@ -715,10 +726,28 @@ export default function TrackerApp() {
                               {task.status === "complete" ? (
                                 <div
                                   aria-hidden="true"
-                                  className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[var(--accent-soft)]/65"
+                                  style={{ gap: "6px" }}
+                                  className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[var(--accent-soft)]/65"
                                 >
-                                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-xl font-semibold text-[#dcebe3] shadow-sm">
-                                    ✓
+                                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-[var(--ink)] shadow-sm">
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth={3}
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className="h-[18px] w-[18px]"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  </span>
+                                  <span
+                                    style={{ fontSize: "11px", lineHeight: 1 }}
+                                    className="font-semibold uppercase tracking-wider text-[var(--accent)]"
+                                  >
+                                    Complete!
                                   </span>
                                 </div>
                               ) : null}

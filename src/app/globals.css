@@ -1,20 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #1c2520;
-  --ink-muted: #5a6b62;
-  --ink-light: #9aa9a0;
-  --paper: #f3f6f4;
-  --paper-2: #e7eee9;
-  --line: #c5d2cb;
-  --accent: #1f6b4a;
-  --accent-hover: #18553b;
-  --accent-soft: #d8efe4;
-  --warn: #8a5a12;
-  --danger: #8b2e2e;
-  --complete: #1f6b4a;
-  --obsolete: #6b7280;
-  --shadow: 0 12px 40px rgba(28, 37, 32, 0.08);
+  /*
+   * Brand ramp — a single teal-green hue (~165°) at ~80% saturation,
+   * stepped by lightness only, so every accent tone feels like one family.
+   */
+  --accent-950: #06362a;
+  --accent-800: #0b634d;
+  --accent-600: #0f8c6d;
+  --accent-500: #14b58d;
+  --accent-300: #18deac;
+
+  /*
+   * Harmonic grayscale — the same 165° hue at a whisper of saturation (8%),
+   * so neutrals read as "the brand, quieted down" rather than generic gray.
+   * Limited to 6 steps and reused across every text/border/surface role.
+   */
+  --gray-950: #0e1110;
+  --gray-900: #1c2120;
+  --gray-800: #2a3230;
+  --gray-700: #424d4a;
+  --gray-500: #6c7f7a;
+  --gray-100: #dee3e2;
+
+  --ink: var(--gray-100);
+  --ink-muted: var(--gray-500);
+  --ink-light: var(--gray-700);
+  --paper: var(--gray-950);
+  --paper-2: var(--gray-900);
+  --surface: var(--gray-900);
+  --surface-strong: var(--gray-800);
+  --line: var(--gray-700);
+
+  --accent: var(--accent-500);
+  --accent-hover: var(--accent-300);
+  --accent-deep: var(--accent-800);
+  --accent-soft: var(--accent-950);
+  --warn: #e3a548;
+  --danger: #e2665c;
+  --danger-bg: #2b1412;
+  --danger-border: #642f2b;
+  --complete: var(--accent-500);
+  --obsolete: var(--gray-500);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -23,9 +51,12 @@
   --color-ink-light: var(--ink-light);
   --color-paper: var(--paper);
   --color-paper-2: var(--paper-2);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-accent-deep: var(--accent-deep);
   --color-accent-soft: var(--accent-soft);
   --font-sans: var(--font-app);
   --font-serif: var(--font-app);
@@ -43,9 +74,9 @@ body {
   font-size: 1.4rem;
   line-height: 2.1rem;
   background:
-    radial-gradient(ellipse 80% 50% at 10% -10%, #dcebe3 0%, transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, #e4ebe7 0%, transparent 50%),
-    linear-gradient(180deg, #eef3f0 0%, var(--paper) 40%, #e9efeb 100%);
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(24, 222, 172, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(15, 140, 109, 0.10) 0%, transparent 50%),
+    linear-gradient(180deg, var(--gray-900) 0%, var(--paper) 45%, #070908 100%);
 }
 
 /* Scale Tailwind's typography tiers by 1.4× without scaling layout spacing. */
@@ -72,11 +103,6 @@ body {
 .text-3xl {
   font-size: 2.625rem;
   line-height: 3.15rem;
-}
-
-.text-4xl {
-  font-size: 3.15rem;
-  line-height: 3.5rem;
 }
 
 button,
