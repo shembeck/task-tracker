@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { pushBackup } from "@/lib/backup";
 
 export async function GET() {
   const members = await prisma.teamMember.findMany({
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const member = await prisma.teamMember.create({ data: { name } });
+    await pushBackup();
     return NextResponse.json(member, { status: 201 });
   } catch {
     return NextResponse.json(

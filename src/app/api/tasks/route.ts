@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { rolloverIncompleteTasks } from "@/lib/rollover";
-import { syncCurrentWeekToDoc } from "@/lib/google-doc-sync";
+import { pushBackup } from "@/lib/backup";
 import {
   currentWeekStart,
   isValidWeekStart,
@@ -12,7 +12,7 @@ import {
 export async function GET(request: NextRequest) {
   const { moved } = await rolloverIncompleteTasks();
   if (moved > 0) {
-    await syncCurrentWeekToDoc();
+    await pushBackup();
   }
 
   const weekParam = request.nextUrl.searchParams.get("week");
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     include: { member: true },
   });
 
-  await syncCurrentWeekToDoc();
+  await pushBackup();
 
   return NextResponse.json(task, { status: 201 });
 }

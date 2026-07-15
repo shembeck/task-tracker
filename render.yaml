@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: task-tracker
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # SQLite lives on the ephemeral filesystem. On the free tier it is wiped on
+      # every redeploy and spin-down; the app restores from the Google Drive JSON
+      # backup on startup, so configure GOOGLE_APPS_SCRIPT_URL / GOOGLE_SYNC_SECRET.
+      - key: DATABASE_URL
+        value: file:/tmp/prod.db
+      - key: APP_TIMEZONE
+        value: America/Los_Angeles
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: SITE_PASSWORD
+        sync: false
+      - key: GOOGLE_APPS_SCRIPT_URL
+        sync: false
+      - key: GOOGLE_SYNC_SECRET
+        sync: false
