@@ -3,6 +3,7 @@
 :root {
   --ink: #1c2520;
   --ink-muted: #5a6b62;
+  --ink-light: #9aa9a0;
   --paper: #f3f6f4;
   --paper-2: #e7eee9;
   --line: #c5d2cb;
@@ -19,14 +20,15 @@
 @theme inline {
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
+  --color-ink-light: var(--ink-light);
   --color-paper: var(--paper);
   --color-paper-2: var(--paper-2);
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
-  --font-sans: var(--font-sans);
-  --font-serif: var(--font-serif);
+  --font-sans: var(--font-app);
+  --font-serif: var(--font-app);
 }
 
 * {
@@ -37,11 +39,44 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--ink);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-app), system-ui, sans-serif;
+  font-size: 1.4rem;
+  line-height: 2.1rem;
   background:
     radial-gradient(ellipse 80% 50% at 10% -10%, #dcebe3 0%, transparent 55%),
     radial-gradient(ellipse 60% 40% at 100% 0%, #e4ebe7 0%, transparent 50%),
     linear-gradient(180deg, #eef3f0 0%, var(--paper) 40%, #e9efeb 100%);
+}
+
+/* Scale Tailwind's typography tiers by 1.4× without scaling layout spacing. */
+.text-xs {
+  font-size: 1.05rem;
+  line-height: 1.4rem;
+}
+
+.text-sm {
+  font-size: 1.225rem;
+  line-height: 1.75rem;
+}
+
+.text-base {
+  font-size: 1.4rem;
+  line-height: 2.1rem;
+}
+
+.text-xl {
+  font-size: 1.75rem;
+  line-height: 2.45rem;
+}
+
+.text-3xl {
+  font-size: 2.625rem;
+  line-height: 3.15rem;
+}
+
+.text-4xl {
+  font-size: 3.15rem;
+  line-height: 3.5rem;
 }
 
 button,

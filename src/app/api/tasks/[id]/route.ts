@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { rolloverIncompleteTasks } from "@/lib/rollover";
+import { syncCurrentWeekToDoc } from "@/lib/google-doc-sync";
 import { weekKind } from "@/lib/weeks";
 
 const STATUSES = new Set(["active", "complete", "obsolete"]);
@@ -75,6 +76,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     include: { member: true },
   });
 
+  await syncCurrentWeekToDoc();
+
   return NextResponse.json(task);
 }
 
@@ -95,5 +98,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   }
 
   await prisma.task.delete({ where: { id } });
+
+  await syncCurrentWeekToDoc();
+
   return NextResponse.json({ ok: true });
 }

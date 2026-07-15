@@ -41,7 +41,7 @@ export default function LoginPage() {
         onSubmit={onSubmit}
         className="w-full max-w-sm rounded-2xl border border-[var(--line)] bg-white/80 p-8 shadow-[var(--shadow)] backdrop-blur"
       >
-        <p className="font-[family-name:var(--font-serif)] text-3xl tracking-tight text-[var(--ink)]">
+        <p className="font-sans text-3xl tracking-tight text-[var(--ink)]">
           Weekly Tasks
         </p>
         <p className="mt-2 text-sm text-[var(--ink-muted)]">

@@ -22,6 +22,8 @@ Open [http://localhost:3000](http://localhost:3000). Default password is `change
 | `SITE_PASSWORD` | Shared team password |
 | `AUTH_SECRET` | Cookie signing secret |
 | `APP_TIMEZONE` | Calendar timezone (default `America/Los_Angeles`); weeks are **Monday–Sunday** |
+| `GOOGLE_APPS_SCRIPT_URL` | Optional. Apps Script web app URL for Google Doc sync |
+| `GOOGLE_SYNC_SECRET` | Optional. Shared secret matching the Apps Script `SYNC_SECRET` |
 
 ## Features
 
@@ -31,3 +33,10 @@ Open [http://localhost:3000](http://localhost:3000). Default password is `change
 - Browse past weeks; mark tasks complete or obsolete there
 - Edit / delete tasks on current and future weeks
 - Active incomplete tasks from past weeks roll forward into the current week
+- Optional: mirror the current week into a Google Doc on every change
+
+## Google Doc sync (optional)
+
+The app can push the current week's tasks into a Google Doc so it doubles as the
+shareable weekly document. The app remains the source of truth; the Doc is a
+generated view. Setup instructions: [`google-apps-script/README.md`](./google-apps-script/README.md).

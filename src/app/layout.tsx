@@ -1,17 +1,11 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 
-const sans = IBM_Plex_Sans({
-  variable: "--font-sans",
+const appFont = Manrope({
+  variable: "--font-app",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-
-const serif = Source_Serif_4({
-  variable: "--font-serif",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -26,9 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${sans.variable} ${serif.variable} antialiased`}>
-        {children}
-      </body>
+      <body className={`${appFont.variable} antialiased`}>{children}</body>
     </html>
   );
 }
