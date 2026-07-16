@@ -6,9 +6,9 @@ import { compareISODates, formatWeekLabel } from "./weeks";
  * One-way backup + restore against the Google Apps Script web app.
  *
  * The app pushes a FULL snapshot (all members + all tasks) on every change. The
- * Apps Script stores it as a JSON file in Drive (machine-readable, used to
- * restore the database after a restart) and rewrites the companion Google Doc as
- * a human-readable archive with each week as a section, newest on top.
+ * Apps Script stores it in Script Properties (machine-readable, used to restore
+ * the database after a restart) and rewrites the companion Google Doc as a
+ * human-readable archive with each week as a section, newest on top.
  *
  * This exists so the app can run on hosts without persistent storage (e.g. a
  * Render free web service, whose filesystem — and therefore its SQLite database
@@ -46,6 +46,14 @@ export type Snapshot = {
   members: SnapshotMember[];
   tasks: SnapshotTask[];
   weeks: DocWeek[];
+};
+
+export type PushBackupResult = {
+  ok: boolean;
+  skipped?: string;
+  members?: number;
+  tasks?: number;
+  error?: string;
 };
 
 async function buildSnapshot(): Promise<Snapshot> {
@@ -136,60 +144,137 @@ export function clearBackupHealthy(): void {
 }
 
 /**
- * Best-effort push of a full snapshot. Never throws — a backend outage must not
- * break task operations.
+ * Apps Script web apps return a 302 to a googleusercontent echo URL. Following
+ * that redirect with a POST can drop the body; use manual redirect handling.
+ * Also prefer text/plain — application/json is flaky with Apps Script doPost.
  */
-export async function pushBackup(): Promise<void> {
+async function postSnapshot(
+  url: string,
+  secret: string,
+  snapshot: Snapshot
+): Promise<{ ok: boolean; members?: number; tasks?: number; error?: string }> {
+  const body = JSON.stringify({ secret, ...snapshot });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body,
+      signal: controller.signal,
+      redirect: "manual",
+    });
+
+    let finalRes = res;
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) {
+        return { ok: false, error: `redirect without location (${res.status})` };
+      }
+      finalRes = await fetch(location, {
+        method: "GET",
+        signal: controller.signal,
+        redirect: "follow",
+      });
+    }
+
+    const text = await finalRes.text();
+    let result: {
+      ok?: boolean;
+      members?: number;
+      tasks?: number;
+      error?: string;
+    } | null = null;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      return {
+        ok: false,
+        error: `non-JSON response HTTP ${finalRes.status}: ${text.slice(0, 200)}`,
+      };
+    }
+
+    if (!finalRes.ok || result?.ok === false) {
+      return {
+        ok: false,
+        error: result?.error || `HTTP ${finalRes.status}`,
+      };
+    }
+
+    return {
+      ok: true,
+      members: result?.members,
+      tasks: result?.tasks,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function pushBackupOnce(): Promise<PushBackupResult> {
   const url = process.env.GOOGLE_APPS_SCRIPT_URL;
   const secret = process.env.GOOGLE_SYNC_SECRET;
-  if (!url || !secret) return;
+  if (!url || !secret) {
+    return { ok: false, skipped: "not-configured" };
+  }
 
   if (!isBackupHealthy()) {
     console.warn(
       "Skipping backup push: startup restore has not completed successfully " +
         "(guarding against overwriting a good backup)."
     );
-    return;
+    return { ok: false, skipped: "not-healthy" };
   }
 
   try {
     const snapshot = await buildSnapshot();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    console.log(
+      `Backup pushing snapshot: ${snapshot.members.length} members, ${snapshot.tasks.length} tasks`
+    );
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret, ...snapshot }),
-      signal: controller.signal,
-      redirect: "follow",
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.error(`Backup push failed: HTTP ${res.status} ${body}`);
-      return;
+    const result = await postSnapshot(url, secret, snapshot);
+    if (!result.ok) {
+      console.error("Backup push failed:", result.error);
+      return { ok: false, error: result.error };
     }
 
-    const result = await res.json().catch(() => null);
-    if (result && result.ok === false) {
-      console.error("Backup push rejected:", result.error || result);
-      return;
-    }
     console.log(
       "Backup push ok:",
-      result
-        ? `${result.members ?? "?"} members, ${result.tasks ?? "?"} tasks`
-        : "no body"
+      `${result.members ?? snapshot.members.length} members, ` +
+        `${result.tasks ?? snapshot.tasks.length} tasks`
     );
+    return {
+      ok: true,
+      members: result.members ?? snapshot.members.length,
+      tasks: result.tasks ?? snapshot.tasks.length,
+    };
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("Backup push error:", err);
+    return { ok: false, error: message };
   }
 }
 
+/**
+ * Serialize backup pushes so concurrent API requests can't race and overwrite a
+ * newer snapshot with an older one (e.g. adding members quickly).
+ * Each run builds a fresh snapshot after the previous push finishes.
+ */
+let backupChain: Promise<unknown> = Promise.resolve();
+
+export function pushBackup(): Promise<PushBackupResult> {
+  const run = backupChain.then(() => pushBackupOnce());
+  // Keep the chain alive even if a push fails.
+  backupChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
 /** Fetch the latest snapshot from the backend. Throws if unreachable. */
-async function fetchBackup(
+export async function fetchBackup(
   url: string,
   secret: string
 ): Promise<Snapshot | null> {
@@ -218,6 +303,11 @@ async function fetchBackup(
     (!Array.isArray(data.members) && !Array.isArray(data.tasks))
   ) {
     return null;
+  }
+
+  // empty:true from Apps Script means no backup stored yet
+  if (data.empty === true) {
+    return { generatedAt: "", members: [], tasks: [], weeks: [] };
   }
 
   return {
@@ -293,4 +383,46 @@ export async function restoreIfEmpty(): Promise<RestoreResult> {
     members: snapshot.members.length,
     tasks: snapshot.tasks.length,
   };
+}
+
+/** Local + remote backup status for debugging. */
+export async function getBackupStatus() {
+  const url = process.env.GOOGLE_APPS_SCRIPT_URL;
+  const secret = process.env.GOOGLE_SYNC_SECRET;
+  const [localMembers, localTasks] = await Promise.all([
+    prisma.teamMember.count(),
+    prisma.task.count(),
+  ]);
+
+  const base = {
+    configured: Boolean(url && secret),
+    healthy: isBackupHealthy(),
+    local: { members: localMembers, tasks: localTasks },
+  };
+
+  if (!url || !secret) {
+    return { ...base, remote: null as null };
+  }
+
+  try {
+    const remote = await fetchBackup(url, secret);
+    return {
+      ...base,
+      remote: remote
+        ? {
+            members: remote.members.length,
+            tasks: remote.tasks.length,
+            generatedAt: remote.generatedAt || null,
+            memberNames: remote.members.map((m) => m.name),
+          }
+        : null,
+    };
+  } catch (err) {
+    return {
+      ...base,
+      remote: {
+        error: err instanceof Error ? err.message : String(err),
+      },
+    };
+  }
 }
