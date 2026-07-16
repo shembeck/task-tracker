@@ -25,3 +25,9 @@ services:
         sync: false
       - key: GOOGLE_SYNC_SECRET
         sync: false
+      - key: BACKUP_ENV
+        value: production
+      - key: BACKUP_PUSH_ENABLED
+        value: "true"
+      - key: BACKUP_RESTORE_ENABLED
+        value: "true"

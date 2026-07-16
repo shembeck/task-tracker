@@ -23,6 +23,14 @@ var BACKUP_CHUNK_PREFIX = "BACKUP_CHUNK_";
 // Script Properties allow ~9KB per value; stay under that with headroom.
 var CHUNK_SIZE = 8000;
 
+function backupKeys(environment) {
+  var env = environment || "production";
+  return {
+    chunksKey: BACKUP_CHUNKS_KEY + "_" + env,
+    chunkPrefix: BACKUP_CHUNK_PREFIX + env + "_"
+  };
+}
+
 function doPost(e) {
   try {
     var payload = JSON.parse(e.postData.contents);
@@ -30,11 +38,16 @@ function doPost(e) {
       return jsonOutput({ ok: false, error: "unauthorized" });
     }
 
-    var saved = saveBackup(payload);
-    renderDoc(payload);
+    var environment = payload.environment || "production";
+    var saved = saveBackup(payload, environment);
+    // Only production pushes rewrite the shared Google Doc archive.
+    if (environment === "production") {
+      renderDoc(payload);
+    }
 
     return jsonOutput({
       ok: true,
+      environment: environment,
       members: saved.members,
       tasks: saved.tasks,
       bytes: saved.bytes,
@@ -51,9 +64,17 @@ function doGet(e) {
     if (!authorized(secret)) {
       return jsonOutput({ ok: false, error: "unauthorized" });
     }
-    var content = latestBackupContent();
+    var environment =
+      e && e.parameter && e.parameter.env ? e.parameter.env : "production";
+    var content = latestBackupContent(environment);
     if (!content) {
-      return jsonOutput({ ok: true, empty: true, members: [], tasks: [] });
+      return jsonOutput({
+        ok: true,
+        empty: true,
+        environment: environment,
+        members: [],
+        tasks: []
+      });
     }
     return ContentService.createTextOutput(content).setMimeType(
       ContentService.MimeType.JSON
@@ -72,9 +93,24 @@ function authorized(secret) {
 
 /* ---------- JSON backup in Script Properties (no Drive) ---------- */
 
-function latestBackupContent() {
+function latestBackupContent(environment) {
+  var content = latestBackupContentForKeys(backupKeys(environment));
+  if (content) return content;
+
+  // Pre-environment backups used unprefixed keys; keep reading them for
+  // production until a production push writes BACKUP_CHUNKS_production.
+  if (environment === "production") {
+    return latestBackupContentForKeys({
+      chunksKey: BACKUP_CHUNKS_KEY,
+      chunkPrefix: BACKUP_CHUNK_PREFIX
+    });
+  }
+  return null;
+}
+
+function latestBackupContentForKeys(keys) {
   var props = PropertiesService.getScriptProperties();
-  var countStr = props.getProperty(BACKUP_CHUNKS_KEY);
+  var countStr = props.getProperty(keys.chunksKey);
   if (!countStr) return null;
 
   var count = Number(countStr);
@@ -82,14 +118,14 @@ function latestBackupContent() {
 
   var parts = [];
   for (var i = 0; i < count; i++) {
-    var piece = props.getProperty(BACKUP_CHUNK_PREFIX + i);
+    var piece = props.getProperty(keys.chunkPrefix + i);
     if (piece === null || piece === undefined) return null;
     parts.push(piece);
   }
   return parts.join("");
 }
 
-function saveBackup(payload) {
+function saveBackup(payload, environment) {
   // Store only what's needed to rebuild the database — never the shared secret.
   var members = payload.members || [];
   var tasks = payload.tasks || [];
@@ -100,14 +136,15 @@ function saveBackup(payload) {
   };
   var json = JSON.stringify(backup);
 
+  var keys = backupKeys(environment);
   var props = PropertiesService.getScriptProperties();
 
-  // Clear previous chunks.
-  var oldCount = Number(props.getProperty(BACKUP_CHUNKS_KEY) || "0");
+  // Clear previous chunks for this environment slot.
+  var oldCount = Number(props.getProperty(keys.chunksKey) || "0");
   for (var i = 0; i < oldCount; i++) {
-    props.deleteProperty(BACKUP_CHUNK_PREFIX + i);
+    props.deleteProperty(keys.chunkPrefix + i);
   }
-  props.deleteProperty(BACKUP_CHUNKS_KEY);
+  props.deleteProperty(keys.chunksKey);
 
   // Write new chunks.
   var chunks = [];
@@ -117,9 +154,9 @@ function saveBackup(payload) {
   if (chunks.length === 0) chunks.push("{}");
 
   var toSet = {};
-  toSet[BACKUP_CHUNKS_KEY] = String(chunks.length);
+  toSet[keys.chunksKey] = String(chunks.length);
   for (var c = 0; c < chunks.length; c++) {
-    toSet[BACKUP_CHUNK_PREFIX + c] = chunks[c];
+    toSet[keys.chunkPrefix + c] = chunks[c];
   }
   props.setProperties(toSet, false);
 

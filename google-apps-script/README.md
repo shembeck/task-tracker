@@ -69,12 +69,24 @@ storage), not as a Drive file. There is no `task-tracker-backup.json` in Drive.
    > endpoint is still protected: every request must include the correct
    > `secret`, and the returned data contains no credentials.
 
-6. **Configure the app.** Set these environment variables (locally in `.env`, or
-   in your host's dashboard):
+6. **Configure the app.** Set these environment variables in your host's
+   dashboard (production). **Do not copy production credentials into local
+   `.env` for day-to-day dev** — a local change used to overwrite the live
+   backup when both pointed at the same Apps Script URL.
+
+   Production (Render):
    ```
    GOOGLE_APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfyc.../exec"
    GOOGLE_SYNC_SECRET="the-same-long-random-string-as-SYNC_SECRET"
+   BACKUP_ENV="production"
+   BACKUP_PUSH_ENABLED="true"
+   BACKUP_RESTORE_ENABLED="true"
    ```
+
+   Local dev: leave `GOOGLE_*` empty, or use a separate test deployment with
+   `BACKUP_ENV="development"`. Push and restore are **off by default** unless
+   `BACKUP_PUSH_ENABLED=true` / `BACKUP_RESTORE_ENABLED=true`.
+
    Restart / redeploy the app.
 
 That's it. Add or change a task and both the backup and the Doc update within a
@@ -85,7 +97,7 @@ few seconds.
 Open this URL in a browser (use your real `/exec` URL and secret):
 
 ```
-https://script.google.com/macros/s/.../exec?secret=YOUR_SECRET
+https://script.google.com/macros/s/.../exec?secret=YOUR_SECRET&env=production
 ```
 
 - First run / empty: `{"ok":true,"empty":true,"members":[],"tasks":[]}`
@@ -93,8 +105,9 @@ https://script.google.com/macros/s/.../exec?secret=YOUR_SECRET
   populated (no `empty: true`).
 
 You can also confirm Script Properties after a backup:
-`Project Settings → Script properties` should show `BACKUP_CHUNKS` and
-`BACKUP_CHUNK_0` (etc.).
+`Project Settings → Script properties` should show `BACKUP_CHUNKS_production` and
+`BACKUP_CHUNK_production_0` (etc.). Older installs may still have unprefixed
+`BACKUP_CHUNKS` keys until the next production push.
 
 ## Updating the script later
 
@@ -109,6 +122,10 @@ is a common reason the GET URL stays empty.
 
 ## Notes
 
+- **Local dev vs production:** Backups are stored per environment
+  (`BACKUP_CHUNKS_production`, `BACKUP_CHUNKS_development`, …). Only
+  `environment: "production"` pushes rewrite the Google Doc. Local `npm run dev`
+  will not push or restore unless you explicitly set `BACKUP_PUSH_ENABLED=true`.
 - **Disabling backup/sync:** clear `GOOGLE_APPS_SCRIPT_URL`. The app skips it
   silently (and, with no persistent storage, will start empty after restarts).
 - **Failures never block the app.** If Google is unreachable when saving, task

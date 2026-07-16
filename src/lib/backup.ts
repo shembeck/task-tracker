@@ -18,6 +18,29 @@ import { compareISODates, formatWeekLabel } from "./weeks";
 const MARKER_PATH =
   process.env.BACKUP_MARKER_PATH || "/tmp/task-tracker-backup-ok";
 
+/** Which backup slot in Apps Script to read/write (e.g. "production"). */
+export function backupEnv(): string {
+  if (process.env.BACKUP_ENV) return process.env.BACKUP_ENV;
+  return process.env.NODE_ENV === "production" ? "production" : "development";
+}
+
+/** Local dev must never overwrite production backup unless explicitly opted in. */
+export function backupPushEnabled(): boolean {
+  if (process.env.BACKUP_PUSH_ENABLED === "true") return true;
+  if (process.env.BACKUP_PUSH_ENABLED === "false") return false;
+  return (
+    process.env.NODE_ENV === "production" && backupEnv() === "production"
+  );
+}
+
+export function backupRestoreEnabled(): boolean {
+  if (process.env.BACKUP_RESTORE_ENABLED === "true") return true;
+  if (process.env.BACKUP_RESTORE_ENABLED === "false") return false;
+  return (
+    process.env.NODE_ENV === "production" && backupEnv() === "production"
+  );
+}
+
 type SnapshotMember = {
   id: string;
   name: string;
@@ -160,9 +183,10 @@ export function clearBackupHealthy(): void {
 async function postSnapshot(
   url: string,
   secret: string,
+  environment: string,
   snapshot: Snapshot
 ): Promise<{ ok: boolean; members?: number; tasks?: number; error?: string }> {
-  const body = JSON.stringify({ secret, ...snapshot });
+  const body = JSON.stringify({ secret, environment, ...snapshot });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
 
@@ -215,6 +239,14 @@ async function pushBackupOnce(): Promise<PushBackupResult> {
     return { ok: false, skipped: "not-configured" };
   }
 
+  if (!backupPushEnabled()) {
+    console.warn(
+      `Skipping backup push: disabled for env=${backupEnv()} ` +
+        `(set BACKUP_PUSH_ENABLED=true only when intentionally pushing).`
+    );
+    return { ok: false, skipped: "push-disabled" };
+  }
+
   if (!isBackupHealthy()) {
     console.warn(
       "Skipping backup push: startup restore has not completed successfully " +
@@ -229,7 +261,8 @@ async function pushBackupOnce(): Promise<PushBackupResult> {
       `Backup pushing snapshot: ${snapshot.members.length} members, ${snapshot.tasks.length} tasks`
     );
 
-    const result = await postSnapshot(url, secret, snapshot);
+    const env = backupEnv();
+    const result = await postSnapshot(url, secret, env, snapshot);
     if (!result.ok) {
       console.error("Backup push failed:", result.error);
       return { ok: false, error: result.error };
@@ -272,14 +305,19 @@ export function pushBackup(): Promise<PushBackupResult> {
 /** Fetch the latest snapshot from the backend. Throws if unreachable. */
 export async function fetchBackup(
   url: string,
-  secret: string
+  secret: string,
+  environment: string = backupEnv()
 ): Promise<Snapshot | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
 
   let res: Response;
   try {
-    res = await fetch(`${url}?secret=${encodeURIComponent(secret)}`, {
+    const qs = new URLSearchParams({
+      secret,
+      env: environment,
+    });
+    res = await fetch(`${url}?${qs.toString()}`, {
       method: "GET",
       redirect: "follow",
       signal: controller.signal,
@@ -362,6 +400,14 @@ export async function restoreIfEmpty(): Promise<RestoreResult> {
   const secret = process.env.GOOGLE_SYNC_SECRET;
   if (!url || !secret) return { status: "not-configured" };
 
+  if (!backupRestoreEnabled()) {
+    console.warn(
+      `Skipping backup restore: disabled for env=${backupEnv()} ` +
+        `(local dev should not pull production backup on startup).`
+    );
+    return { status: "not-configured" };
+  }
+
   const [memberCount, taskCount] = await Promise.all([
     prisma.teamMember.count(),
     prisma.task.count(),
@@ -395,8 +441,12 @@ export async function getBackupStatus() {
     prisma.task.count(),
   ]);
 
+  const env = backupEnv();
   const base = {
     configured: Boolean(url && secret),
+    environment: env,
+    pushEnabled: backupPushEnabled(),
+    restoreEnabled: backupRestoreEnabled(),
     healthy: isBackupHealthy(),
     local: { members: localMembers, tasks: localTasks },
   };
@@ -406,7 +456,7 @@ export async function getBackupStatus() {
   }
 
   try {
-    const remote = await fetchBackup(url, secret);
+    const remote = await fetchBackup(url, secret, env);
     return {
       ...base,
       remote: remote
