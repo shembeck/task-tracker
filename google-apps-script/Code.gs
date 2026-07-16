@@ -104,11 +104,10 @@ function saveBackup(payload) {
 
   // Clear previous chunks.
   var oldCount = Number(props.getProperty(BACKUP_CHUNKS_KEY) || "0");
-  var toDelete = [];
   for (var i = 0; i < oldCount; i++) {
-    toDelete.push(BACKUP_CHUNK_PREFIX + i);
+    props.deleteProperty(BACKUP_CHUNK_PREFIX + i);
   }
-  if (toDelete.length) props.deleteProperties(toDelete);
+  props.deleteProperty(BACKUP_CHUNKS_KEY);
 
   // Write new chunks.
   var chunks = [];
