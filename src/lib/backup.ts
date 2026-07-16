@@ -167,8 +167,22 @@ export async function pushBackup(): Promise<void> {
     clearTimeout(timeout);
 
     if (!res.ok) {
-      console.error(`Backup push failed: HTTP ${res.status}`);
+      const body = await res.text().catch(() => "");
+      console.error(`Backup push failed: HTTP ${res.status} ${body}`);
+      return;
     }
+
+    const result = await res.json().catch(() => null);
+    if (result && result.ok === false) {
+      console.error("Backup push rejected:", result.error || result);
+      return;
+    }
+    console.log(
+      "Backup push ok:",
+      result
+        ? `${result.members ?? "?"} members, ${result.tasks ?? "?"} tasks`
+        : "no body"
+    );
   } catch (err) {
     console.error("Backup push error:", err);
   }

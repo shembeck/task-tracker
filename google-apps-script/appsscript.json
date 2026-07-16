@@ -3,8 +3,7 @@
   "runtimeVersion": "V8",
   "exceptionLogging": "STACKDRIVER",
   "oauthScopes": [
-    "https://www.googleapis.com/auth/documents.currentonly",
-    "https://www.googleapis.com/auth/drive.file"
+    "https://www.googleapis.com/auth/documents.currentonly"
   ],
   "webapp": {
     "executeAs": "USER_DEPLOYING",

@@ -5,22 +5,23 @@
  * via Extensions → Apps Script.
  *
  *  - doPost: receives a FULL snapshot (all members + all tasks) from the app on
- *    every change. It (1) saves a machine-readable JSON backup file to your
- *    Drive, and (2) rewrites the Doc as a human-readable archive with each week
- *    as a section, newest week on top.
+ *    every change. It (1) saves a machine-readable JSON backup in Script
+ *    Properties (no Drive access needed), and (2) rewrites the Doc as a
+ *    human-readable archive with each week as a section, newest week on top.
  *  - doGet:  returns the latest JSON backup so the app can restore its database
  *    after a restart (needed on hosts without persistent storage).
  *
- * Drive access is limited to the single backup file this script creates (the
- * `drive.file` scope in appsscript.json) — it can NOT see the rest of your
- * Drive. The file's id is remembered in a script property, so the script never
- * searches or lists your Drive.
- *
  * Setup: see google-apps-script/README.md in the repo.
+ *
+ * IMPORTANT: After editing this file you MUST publish a new deployment version
+ * (Deploy → Manage deployments → Edit → Version: New version) or the live URL
+ * keeps running the old code.
  */
 
-var BACKUP_FILENAME = "task-tracker-backup.json";
-var BACKUP_FILE_ID_KEY = "BACKUP_FILE_ID";
+var BACKUP_CHUNKS_KEY = "BACKUP_CHUNKS";
+var BACKUP_CHUNK_PREFIX = "BACKUP_CHUNK_";
+// Script Properties allow ~9KB per value; stay under that with headroom.
+var CHUNK_SIZE = 8000;
 
 function doPost(e) {
   try {
@@ -28,9 +29,17 @@ function doPost(e) {
     if (!authorized(payload.secret)) {
       return jsonOutput({ ok: false, error: "unauthorized" });
     }
-    saveBackup(payload);
+
+    var saved = saveBackup(payload);
     renderDoc(payload);
-    return jsonOutput({ ok: true });
+
+    return jsonOutput({
+      ok: true,
+      members: saved.members,
+      tasks: saved.tasks,
+      bytes: saved.bytes,
+      chunks: saved.chunks
+    });
   } catch (err) {
     return jsonOutput({ ok: false, error: String(err) });
   }
@@ -61,45 +70,66 @@ function authorized(secret) {
   return expected && secret === expected;
 }
 
-/* ---------- JSON backup (machine-readable, used for restore) ---------- */
+/* ---------- JSON backup in Script Properties (no Drive) ---------- */
 
 function latestBackupContent() {
-  var id = PropertiesService.getScriptProperties().getProperty(
-    BACKUP_FILE_ID_KEY
-  );
-  if (!id) return null;
-  try {
-    return DriveApp.getFileById(id).getBlob().getDataAsString();
-  } catch (err) {
-    // File was deleted/inaccessible — treat as no backup.
-    return null;
+  var props = PropertiesService.getScriptProperties();
+  var countStr = props.getProperty(BACKUP_CHUNKS_KEY);
+  if (!countStr) return null;
+
+  var count = Number(countStr);
+  if (!count || count < 1) return null;
+
+  var parts = [];
+  for (var i = 0; i < count; i++) {
+    var piece = props.getProperty(BACKUP_CHUNK_PREFIX + i);
+    if (piece === null || piece === undefined) return null;
+    parts.push(piece);
   }
+  return parts.join("");
 }
 
 function saveBackup(payload) {
   // Store only what's needed to rebuild the database — never the shared secret.
+  var members = payload.members || [];
+  var tasks = payload.tasks || [];
   var backup = {
     generatedAt: payload.generatedAt || new Date().toISOString(),
-    members: payload.members || [],
-    tasks: payload.tasks || []
+    members: members,
+    tasks: tasks
   };
   var json = JSON.stringify(backup);
 
   var props = PropertiesService.getScriptProperties();
 
-  // Drive has no "overwrite contents" for a File, so trash the previous backup
-  // (tracked by id — no Drive-wide search needed) and create a fresh one.
-  var oldId = props.getProperty(BACKUP_FILE_ID_KEY);
-  if (oldId) {
-    try {
-      DriveApp.getFileById(oldId).setTrashed(true);
-    } catch (err) {
-      // Already gone — ignore.
-    }
+  // Clear previous chunks.
+  var oldCount = Number(props.getProperty(BACKUP_CHUNKS_KEY) || "0");
+  var toDelete = [];
+  for (var i = 0; i < oldCount; i++) {
+    toDelete.push(BACKUP_CHUNK_PREFIX + i);
   }
+  if (toDelete.length) props.deleteProperties(toDelete);
 
-  var file = DriveApp.createFile(BACKUP_FILENAME, json, "application/json");
-  props.setProperty(BACKUP_FILE_ID_KEY, file.getId());
+  // Write new chunks.
+  var chunks = [];
+  for (var offset = 0; offset < json.length; offset += CHUNK_SIZE) {
+    chunks.push(json.substring(offset, offset + CHUNK_SIZE));
+  }
+  if (chunks.length === 0) chunks.push("{}");
+
+  var toSet = {};
+  toSet[BACKUP_CHUNKS_KEY] = String(chunks.length);
+  for (var c = 0; c < chunks.length; c++) {
+    toSet[BACKUP_CHUNK_PREFIX + c] = chunks[c];
+  }
+  props.setProperties(toSet, false);
+
+  return {
+    members: members.length,
+    tasks: tasks.length,
+    bytes: json.length,
+    chunks: chunks.length
+  };
 }
 
 /* ---------- Human-readable Doc archive (newest week on top) ---------- */

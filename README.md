@@ -40,8 +40,8 @@ Open [http://localhost:3000](http://localhost:3000). Default password is `change
 The app pushes a full snapshot (all members + all tasks) to a Google Apps Script
 web app on every change. That script:
 
-- saves a machine-readable `task-tracker-backup.json` to your Google Drive, which
-  the app **restores from on startup**, and
+- saves a machine-readable JSON snapshot in Apps Script **Script Properties**
+  (no Drive file access), which the app **restores from on startup**, and
 - rewrites a Google Doc as a human-readable archive (each week a section, newest
   on top).
 
