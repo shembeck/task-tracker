@@ -151,6 +151,38 @@ export default function TrackerApp() {
     }
   }
 
+  async function removeMember(member: TeamMember) {
+    setError("");
+    if (
+      !window.confirm(
+        `Remove ${member.name} from the team?\n\nTheir past and current tasks will stay on the board; they just won’t appear in the selector anymore.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/members/${member.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setError(data?.error || "Could not remove team member");
+        return;
+      }
+
+      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+      if (memberId === member.id) setMemberId("");
+      // Keep the week board as-is; their tasks remain visible via member relation.
+      if (data?.backup && data.backup.ok === false) {
+        setError(
+          `Member removed, but backup failed (${data.backup.error || data.backup.skipped || "unknown"}).`
+        );
+      }
+    } catch {
+      setError("Could not remove team member — check your connection");
+    }
+  }
+
   async function submitTasks(e: FormEvent) {
     e.preventDefault();
     if (!memberId || !canAddTasks) return;
@@ -309,22 +341,42 @@ export default function TrackerApp() {
             {members.map((m) => {
               const selected = m.id === memberId;
               return (
-                <button
+                <span
                   key={m.id}
-                  type="button"
-                  onClick={() => {
-                    setMemberId(m.id);
-                    setShowSelectHint(false);
-                  }}
-                  aria-pressed={selected}
-                  className={`rounded-full px-3 py-1 text-sm transition ${
+                  className={`group inline-flex items-center gap-1 rounded-full py-1 pl-3 pr-1 text-sm transition ${
                     selected
                       ? "bg-[var(--accent)] font-medium text-white"
                       : "bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--line)]"
                   }`}
                 >
-                  {m.name}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMemberId(m.id);
+                      setShowSelectHint(false);
+                    }}
+                    aria-pressed={selected}
+                    className="min-w-0"
+                  >
+                    {m.name}
+                  </button>
+                  <button
+                    type="button"
+                    title={`Remove ${m.name}`}
+                    aria-label={`Remove ${m.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void removeMember(m);
+                    }}
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs leading-none transition ${
+                      selected
+                        ? "text-white/70 opacity-0 hover:bg-white/15 hover:text-white group-hover:opacity-100 focus:opacity-100"
+                        : "text-[var(--ink-muted)] opacity-0 hover:bg-[var(--paper)] hover:text-[var(--danger)] group-hover:opacity-100 focus:opacity-100"
+                    }`}
+                  >
+                    ×
+                  </button>
+                </span>
               );
             })}
             {showNewMember ? (

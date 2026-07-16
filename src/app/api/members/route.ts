@@ -4,6 +4,7 @@ import { pushBackup } from "@/lib/backup";
 
 export async function GET() {
   const members = await prisma.teamMember.findMany({
+    where: { active: true },
     orderBy: { name: "asc" },
   });
   return NextResponse.json(members);
@@ -21,6 +22,17 @@ export async function POST(request: NextRequest) {
     where: { name: { equals: name } },
   });
   if (existing) {
+    if (!existing.active) {
+      const member = await prisma.teamMember.update({
+        where: { id: existing.id },
+        data: { active: true },
+      });
+      const backup = await pushBackup();
+      if (!backup.ok) {
+        console.error("Member reactivated but backup failed:", backup);
+      }
+      return NextResponse.json({ ...member, backup, reactivated: true });
+    }
     return NextResponse.json(
       { error: `"${existing.name}" is already on the team` },
       { status: 409 }

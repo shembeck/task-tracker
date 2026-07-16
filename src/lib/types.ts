@@ -1,6 +1,7 @@
 export type TeamMember = {
   id: string;
   name: string;
+  active?: boolean;
   createdAt: string;
 };
 

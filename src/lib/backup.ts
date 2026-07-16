@@ -18,7 +18,12 @@ import { compareISODates, formatWeekLabel } from "./weeks";
 const MARKER_PATH =
   process.env.BACKUP_MARKER_PATH || "/tmp/task-tracker-backup-ok";
 
-type SnapshotMember = { id: string; name: string; createdAt: string };
+type SnapshotMember = {
+  id: string;
+  name: string;
+  active: boolean;
+  createdAt: string;
+};
 
 type SnapshotTask = {
   id: string;
@@ -68,6 +73,7 @@ async function buildSnapshot(): Promise<Snapshot> {
   const snapMembers: SnapshotMember[] = members.map((m) => ({
     id: m.id,
     name: m.name,
+    active: m.active,
     createdAt: m.createdAt.toISOString(),
   }));
 
@@ -314,7 +320,12 @@ async function applySnapshot(snapshot: Snapshot): Promise<void> {
   await prisma.$transaction([
     ...snapshot.members.map((m) =>
       prisma.teamMember.create({
-        data: { id: m.id, name: m.name, createdAt: new Date(m.createdAt) },
+        data: {
+          id: m.id,
+          name: m.name,
+          active: m.active !== false,
+          createdAt: new Date(m.createdAt),
+        },
       })
     ),
     ...snapshot.tasks.map((t) =>
