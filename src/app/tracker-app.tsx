@@ -177,6 +177,11 @@ export default function TrackerApp() {
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.error || "Failed to save task");
+        if (data?.backup && data.backup.ok === false) {
+          setError(
+            `Task saved, but backup failed (${data.backup.error || data.backup.skipped || "unknown"}). Check Render logs.`
+          );
+        }
       }
       setDrafts([emptyDraft()]);
       setShowNote(false);

@@ -79,7 +79,10 @@ export async function POST(request: NextRequest) {
     include: { member: true },
   });
 
-  await pushBackup();
+  const backup = await pushBackup();
+  if (!backup.ok) {
+    console.error("Task saved but backup failed:", backup);
+  }
 
-  return NextResponse.json(task, { status: 201 });
+  return NextResponse.json({ ...task, backup }, { status: 201 });
 }

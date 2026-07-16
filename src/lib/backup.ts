@@ -144,9 +144,12 @@ export function clearBackupHealthy(): void {
 }
 
 /**
- * Apps Script web apps return a 302 to a googleusercontent echo URL. Following
- * that redirect with a POST can drop the body; use manual redirect handling.
- * Also prefer text/plain — application/json is flaky with Apps Script doPost.
+ * Post a snapshot to the Apps Script web app.
+ *
+ * Apps Script accepts the POST, then 302s to a googleusercontent "echo" URL
+ * whose body is the doPost result. `redirect: "follow"` is the reliable mode
+ * in Node — `manual` often hides the Location header and aborts the push.
+ * `text/plain` avoids Apps Script quirks with application/json POSTs.
  */
 async function postSnapshot(
   url: string,
@@ -163,23 +166,10 @@ async function postSnapshot(
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body,
       signal: controller.signal,
-      redirect: "manual",
+      redirect: "follow",
     });
 
-    let finalRes = res;
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get("location");
-      if (!location) {
-        return { ok: false, error: `redirect without location (${res.status})` };
-      }
-      finalRes = await fetch(location, {
-        method: "GET",
-        signal: controller.signal,
-        redirect: "follow",
-      });
-    }
-
-    const text = await finalRes.text();
+    const text = await res.text();
     let result: {
       ok?: boolean;
       members?: number;
@@ -191,14 +181,14 @@ async function postSnapshot(
     } catch {
       return {
         ok: false,
-        error: `non-JSON response HTTP ${finalRes.status}: ${text.slice(0, 200)}`,
+        error: `non-JSON response HTTP ${res.status}: ${text.slice(0, 200)}`,
       };
     }
 
-    if (!finalRes.ok || result?.ok === false) {
+    if (!res.ok || result?.ok === false) {
       return {
         ok: false,
-        error: result?.error || `HTTP ${finalRes.status}`,
+        error: result?.error || `HTTP ${res.status}`,
       };
     }
 

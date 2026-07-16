@@ -29,8 +29,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const member = await prisma.teamMember.create({ data: { name } });
-    await pushBackup();
-    return NextResponse.json(member, { status: 201 });
+    const backup = await pushBackup();
+    if (!backup.ok) {
+      console.error("Member saved but backup failed:", backup);
+    }
+    return NextResponse.json({ ...member, backup }, { status: 201 });
   } catch {
     return NextResponse.json(
       { error: "A team member with that name already exists" },
