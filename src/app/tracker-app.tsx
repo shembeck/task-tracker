@@ -343,7 +343,7 @@ export default function TrackerApp() {
               return (
                 <span
                   key={m.id}
-                  className={`group inline-flex items-center gap-1 rounded-full py-1 pl-3 pr-1 text-sm transition ${
+                  className={`group relative inline-flex items-center rounded-full px-3 py-1 text-sm transition ${
                     selected
                       ? "bg-[var(--accent)] font-medium text-white"
                       : "bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--line)]"
@@ -368,13 +368,19 @@ export default function TrackerApp() {
                       e.stopPropagation();
                       void removeMember(m);
                     }}
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs leading-none transition ${
-                      selected
-                        ? "text-white/70 opacity-0 hover:bg-white/15 hover:text-white group-hover:opacity-100 focus:opacity-100"
-                        : "text-[var(--ink-muted)] opacity-0 hover:bg-[var(--paper)] hover:text-[var(--danger)] group-hover:opacity-100 focus:opacity-100"
-                    }`}
+                    className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--gray-500)] bg-[var(--paper)] text-[var(--ink-muted)] opacity-0 group-hover:opacity-100 focus:opacity-100"
                   >
-                    ×
+                    <svg
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      className="h-2 w-2"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 3l6 6M9 3L3 9" />
+                    </svg>
                   </button>
                 </span>
               );
