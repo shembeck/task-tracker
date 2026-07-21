@@ -2,6 +2,8 @@ export type TeamMember = {
   id: string;
   name: string;
   active?: boolean;
+  sortBy?: string;
+  sortReversed?: boolean;
   createdAt: string;
 };
 

@@ -200,22 +200,57 @@ function renderDoc(payload) {
           .setHeading(DocumentApp.ParagraphHeading.HEADING2);
 
         (member.tasks || []).forEach(function (task) {
+          var priority =
+            task.priority === "high"
+              ? "High"
+              : task.priority === "low"
+                ? "Low"
+                : "Medium";
+          var priorityColor =
+            task.priority === "high"
+              ? "#e2665c"
+              : task.priority === "low"
+                ? "#14b58d"
+                : "#e3a548";
           var suffix =
             task.status === "complete"
               ? "  \u2713 done"
               : task.status === "obsolete"
                 ? "  (obsolete)"
                 : "";
-          var item = body.appendListItem(task.title + suffix);
+          var label = "[" + priority + "] ";
+          var item = body.appendListItem(label + task.title + suffix);
           item.setGlyphType(DocumentApp.GlyphType.BULLET);
-          if (task.status === "complete" || task.status === "obsolete") {
-            item.editAsText().setStrikethrough(true);
+          var text = item.editAsText();
+          // appendListItem inherits styles from the previous list item — always
+          // set strikethrough explicitly so active tasks don't stay struck.
+          text.setStrikethrough(
+            task.status === "complete" || task.status === "obsolete"
+          );
+          text.setForegroundColor(0, label.length - 1, priorityColor);
+          if (task.carriedWeeks) {
+            var weeks = Number(task.carriedWeeks);
+            var carriedLabel = "Carried over · " + weeks + "w";
+            var carried = body.appendParagraph(carriedLabel);
+            carried.setIndentStart(36);
+            carried.setIndentFirstLine(36);
+            var carriedColor =
+              weeks >= 3 ? "#e2665c" : weeks === 2 ? "#e3a548" : "#6c7f7a";
+            carried
+              .editAsText()
+              .setStrikethrough(false)
+              .setForegroundColor(carriedColor)
+              .setFontSize(9);
           }
           if (task.notes) {
             var note = body.appendParagraph(task.notes);
             note.setIndentStart(36);
             note.setIndentFirstLine(36);
-            note.editAsText().setForegroundColor("#5a6b62").setItalic(true);
+            note
+              .editAsText()
+              .setStrikethrough(false)
+              .setForegroundColor("#5a6b62")
+              .setItalic(true);
           }
         });
       });

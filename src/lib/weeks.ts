@@ -76,6 +76,16 @@ export function compareISODates(a: string, b: string) {
   return a < b ? -1 : 1;
 }
 
+/** Whole weeks between two Monday ISO dates (later − earlier). */
+export function weeksBetween(earlier: string, later: string): number {
+  const a = parseISODate(earlier);
+  const b = parseISODate(later);
+  const ms =
+    Date.UTC(b.year, b.month - 1, b.day) -
+    Date.UTC(a.year, a.month - 1, a.day);
+  return Math.max(0, Math.round(ms / (7 * 24 * 60 * 60 * 1000)));
+}
+
 export type WeekKind = "past" | "current" | "future";
 
 export function weekKind(weekStart: string, now = new Date()): WeekKind {

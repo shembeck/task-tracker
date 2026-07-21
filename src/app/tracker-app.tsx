@@ -3,6 +3,13 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Task, TaskPriority, TeamMember, WeekOption } from "@/lib/types";
+import {
+  SORT_OPTIONS,
+  type SortBy,
+  compareTasks,
+  normalizeSortBy,
+} from "@/lib/sort-tasks";
+import { weeksBetween } from "@/lib/weeks";
 
 type DraftTask = { title: string; notes: string; priority: TaskPriority };
 
@@ -26,72 +33,9 @@ const PRIORITY_COLOR: Record<TaskPriority, string> = {
   low: "var(--priority-low)",
 };
 
-const PRIORITY_RANK: Record<TaskPriority, number> = {
-  high: 0,
-  medium: 1,
-  low: 2,
-};
-
-const STATUS_RANK: Record<string, number> = {
-  active: 0,
-  complete: 1,
-  obsolete: 2,
-};
-
-type SortBy = "priority" | "carried" | "status" | "newest";
-
-const SORT_OPTIONS: { value: SortBy; label: string }[] = [
-  { value: "newest", label: "Date added" },
-  { value: "priority", label: "Priority" },
-  { value: "carried", label: "Weeks carried" },
-  { value: "status", label: "Status" },
-];
-
-function normalizePriority(priority: string | undefined): TaskPriority {
-  return priority === "high" || priority === "low" ? priority : "medium";
-}
-
 /** Weeks between two Monday ISO dates (rolledFrom → current task week). */
 function carriedWeekCount(rolledFrom: string, weekStart: string): number {
-  const [fy, fm, fd] = rolledFrom.split("-").map(Number);
-  const [ty, tm, td] = weekStart.split("-").map(Number);
-  const ms = Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd);
-  return Math.max(1, Math.round(ms / (7 * 24 * 60 * 60 * 1000)));
-}
-
-function taskCarriedWeeks(task: Task): number {
-  if (!task.rolledFrom) return 0;
-  return carriedWeekCount(task.rolledFrom, task.weekStart);
-}
-
-function compareTasks(
-  a: Task,
-  b: Task,
-  sortBy: SortBy,
-  sortReversed: boolean
-): number {
-  let cmp = 0;
-  switch (sortBy) {
-    case "priority":
-      cmp =
-        PRIORITY_RANK[normalizePriority(a.priority)] -
-        PRIORITY_RANK[normalizePriority(b.priority)];
-      break;
-    case "carried":
-      cmp = taskCarriedWeeks(b) - taskCarriedWeeks(a);
-      break;
-    case "status":
-      cmp =
-        (STATUS_RANK[a.status] ?? 99) - (STATUS_RANK[b.status] ?? 99);
-      break;
-    case "newest":
-      cmp = b.createdAt.localeCompare(a.createdAt);
-      break;
-  }
-  if (cmp === 0) {
-    cmp = b.createdAt.localeCompare(a.createdAt);
-  }
-  return sortReversed ? -cmp : cmp;
+  return Math.max(1, weeksBetween(rolledFrom, weekStart));
 }
 
 function carriedWeekColor(weeks: number): string | undefined {
@@ -145,6 +89,146 @@ function PrioritySelect({
   );
 }
 
+type MemberSortState = { sortBy: SortBy; reversed: boolean };
+
+function sortStateFromMember(member: {
+  sortBy?: string;
+  sortReversed?: boolean;
+}): MemberSortState {
+  return {
+    sortBy: normalizeSortBy(member.sortBy),
+    reversed: member.sortReversed === true,
+  };
+}
+
+const DEFAULT_MEMBER_SORT: MemberSortState = {
+  sortBy: "newest",
+  reversed: false,
+};
+
+function MemberSortControls({
+  sortBy,
+  reversed,
+  onSortByChange,
+  onReversedChange,
+}: {
+  sortBy: SortBy;
+  reversed: boolean;
+  onSortByChange: (sortBy: SortBy) => void;
+  onReversedChange: (reversed: boolean) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handlePointerDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="relative" ref={menuRef}>
+        <button
+          type="button"
+          aria-label="Sort by"
+          aria-haspopup="listbox"
+          aria-expanded={menuOpen}
+          title={`Sort by: ${
+            SORT_OPTIONS.find((o) => o.value === sortBy)?.label
+          }`}
+          onClick={() => setMenuOpen((open) => !open)}
+          className={`flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--line)] text-[var(--ink-muted)] transition hover:bg-[var(--surface-strong)] hover:text-[var(--ink)] ${
+            menuOpen
+              ? "bg-[var(--surface-strong)] text-[var(--ink)]"
+              : "bg-[var(--paper)]/50"
+          }`}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-3.5 w-3.5"
+            aria-hidden="true"
+          >
+            <path d="M4 6h10M4 12h7M4 18h4" />
+            <path d="M15 10l3-3 3 3M18 7v10" />
+          </svg>
+        </button>
+        {menuOpen ? (
+          <ul
+            role="listbox"
+            aria-label="Sort by"
+            className="absolute right-0 z-20 mt-1.5 min-w-[10.5rem] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-strong)] py-1 shadow-[var(--shadow)]"
+          >
+            {SORT_OPTIONS.map((opt) => {
+              const selected = opt.value === sortBy;
+              return (
+                <li key={opt.value} role="option" aria-selected={selected}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSortByChange(opt.value);
+                      setMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center px-3 py-1.5 text-left text-sm transition hover:bg-[var(--line)] ${
+                      selected
+                        ? "font-medium text-[var(--accent)]"
+                        : "text-[var(--ink)]"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        aria-label={reversed ? "Sort direction: reversed" : "Invert sort"}
+        aria-pressed={reversed}
+        title={reversed ? "Reversed — click to restore" : "Invert sort"}
+        onClick={() => onReversedChange(!reversed)}
+        className={`flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--line)] transition hover:bg-[var(--surface-strong)] hover:text-[var(--ink)] ${
+          reversed
+            ? "bg-[var(--surface-strong)] text-[var(--ink)]"
+            : "bg-[var(--paper)]/50 text-[var(--ink-muted)]"
+        }`}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-3.5 w-3.5"
+          aria-hidden="true"
+        >
+          <path d="M7 3v18M7 3l-3 3M7 3l3 3M17 21V3M17 21l-3-3M17 21l3-3" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export default function TrackerApp() {
   const router = useRouter();
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -171,10 +255,6 @@ export default function TrackerApp() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editNotes, setEditNotes] = useState("");
-  const [sortBy, setSortBy] = useState<SortBy>("newest");
-  const [sortReversed, setSortReversed] = useState(false);
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const sortMenuRef = useRef<HTMLDivElement>(null);
 
   const canAddTasks = weekKind !== "past";
   const canEditContent = weekKind !== "past";
@@ -241,27 +321,6 @@ export default function TrackerApp() {
     };
   }, [weekStart, loadTasks]);
 
-  useEffect(() => {
-    if (!sortMenuOpen) return;
-    function handlePointerDown(e: MouseEvent) {
-      if (
-        sortMenuRef.current &&
-        !sortMenuRef.current.contains(e.target as Node)
-      ) {
-        setSortMenuOpen(false);
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setSortMenuOpen(false);
-    }
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [sortMenuOpen]);
-
   const tasksByMember = useMemo(() => {
     const map = new Map<string, { member: TeamMember; tasks: Task[] }>();
     for (const task of tasks) {
@@ -270,14 +329,77 @@ export default function TrackerApp() {
       else map.set(task.memberId, { member: task.member, tasks: [task] });
     }
     return Array.from(map.values())
-      .map(({ member, tasks: memberTasks }) => ({
-        member,
-        tasks: [...memberTasks].sort((a, b) =>
-          compareTasks(a, b, sortBy, sortReversed)
-        ),
-      }))
+      .map(({ member, tasks: memberTasks }) => {
+        const live = members.find((m) => m.id === member.id) ?? member;
+        const sort = sortStateFromMember(live);
+        return {
+          member: live,
+          tasks: [...memberTasks].sort((a, b) =>
+            compareTasks(a, b, sort.sortBy, sort.reversed)
+          ),
+        };
+      })
       .sort((a, b) => a.member.name.localeCompare(b.member.name));
-  }, [tasks, sortBy, sortReversed]);
+  }, [tasks, members]);
+
+  async function persistMemberSort(
+    id: string,
+    patch: Partial<MemberSortState>
+  ) {
+    const currentMember =
+      members.find((m) => m.id === id) ??
+      tasks.find((t) => t.memberId === id)?.member;
+    const current = currentMember
+      ? sortStateFromMember(currentMember)
+      : DEFAULT_MEMBER_SORT;
+    const next = { ...current, ...patch };
+
+    setMembers((prev) =>
+      prev.map((m) =>
+        m.id === id
+          ? { ...m, sortBy: next.sortBy, sortReversed: next.reversed }
+          : m
+      )
+    );
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.memberId === id
+          ? {
+              ...t,
+              member: {
+                ...t.member,
+                sortBy: next.sortBy,
+                sortReversed: next.reversed,
+              },
+            }
+          : t
+      )
+    );
+
+    setError("");
+    try {
+      const res = await fetch(`/api/members/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sortBy: next.sortBy,
+          sortReversed: next.reversed,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error || "Could not save sort preference");
+        return;
+      }
+      if (data?.backup && data.backup.ok === false) {
+        setError(
+          `Sort saved, but backup failed (${data.backup.error || data.backup.skipped || "unknown"}).`
+        );
+      }
+    } catch {
+      setError("Could not save sort preference — check your connection");
+    }
+  }
 
   const weekLabel =
     weeks.find((w) => w.weekStart === weekStart)?.label || weekStart;
@@ -787,95 +909,6 @@ export default function TrackerApp() {
                 </p>
               ) : null}
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative" ref={sortMenuRef}>
-                <button
-                  type="button"
-                  aria-label="Sort by"
-                  aria-haspopup="listbox"
-                  aria-expanded={sortMenuOpen}
-                  title={`Sort by: ${
-                    SORT_OPTIONS.find((o) => o.value === sortBy)?.label
-                  }`}
-                  onClick={() => setSortMenuOpen((open) => !open)}
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--line)] text-[var(--ink-muted)] transition hover:bg-[var(--surface-strong)] hover:text-[var(--ink)] ${
-                    sortMenuOpen
-                      ? "bg-[var(--surface-strong)] text-[var(--ink)]"
-                      : "bg-[var(--paper)]/50"
-                  }`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
-                    aria-hidden="true"
-                  >
-                    <path d="M4 6h10M4 12h7M4 18h4" />
-                    <path d="M15 10l3-3 3 3M18 7v10" />
-                  </svg>
-                </button>
-                {sortMenuOpen ? (
-                  <ul
-                    role="listbox"
-                    aria-label="Sort by"
-                    className="absolute right-0 z-20 mt-1.5 min-w-[10.5rem] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-strong)] py-1 shadow-[var(--shadow)]"
-                  >
-                    {SORT_OPTIONS.map((opt) => {
-                      const selected = opt.value === sortBy;
-                      return (
-                        <li key={opt.value} role="option" aria-selected={selected}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSortBy(opt.value);
-                              setSortMenuOpen(false);
-                            }}
-                            className={`flex w-full items-center px-3 py-1.5 text-left text-sm transition hover:bg-[var(--line)] ${
-                              selected
-                                ? "font-medium text-[var(--accent)]"
-                                : "text-[var(--ink)]"
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                aria-label={
-                  sortReversed ? "Sort direction: reversed" : "Invert sort"
-                }
-                aria-pressed={sortReversed}
-                title={sortReversed ? "Reversed — click to restore" : "Invert sort"}
-                onClick={() => setSortReversed((v) => !v)}
-                className={`flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--line)] transition hover:bg-[var(--surface-strong)] hover:text-[var(--ink)] ${
-                  sortReversed
-                    ? "bg-[var(--surface-strong)] text-[var(--ink)]"
-                    : "bg-[var(--paper)]/50 text-[var(--ink-muted)]"
-                }`}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                  aria-hidden="true"
-                >
-                  <path d="M7 3v18M7 3l-3 3M7 3l3 3M17 21V3M17 21l-3-3M17 21l3-3" />
-                </svg>
-              </button>
-            </div>
           </div>
 
           {tasksByMember.length === 0 ? (
@@ -891,17 +924,30 @@ export default function TrackerApp() {
                 const active = memberTasks.filter(
                   (t) => t.status === "active"
                 ).length;
+                const sort = sortStateFromMember(member);
                 return (
                   <section
                     key={member.id}
                     className="rounded-xl border border-dotted border-[var(--line)] bg-[var(--paper-2)]/20 p-4"
                   >
-                    <div className="flex items-baseline justify-between gap-2 border-b border-[var(--line)]/40 pb-2">
+                    <div className="flex items-center justify-between gap-2 border-b border-[var(--line)]/40 pb-2">
                       <h3 className="text-base font-semibold">{member.name}</h3>
-                      <p className="text-xs text-[var(--ink-muted)]">
-                        {done}/{memberTasks.length} complete
-                        {active > 0 ? ` · ${active} active` : ""}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-[var(--ink-muted)]">
+                          {done}/{memberTasks.length} complete
+                          {active > 0 ? ` · ${active} active` : ""}
+                        </p>
+                        <MemberSortControls
+                          sortBy={sort.sortBy}
+                          reversed={sort.reversed}
+                          onSortByChange={(next) =>
+                            void persistMemberSort(member.id, { sortBy: next })
+                          }
+                          onReversedChange={(reversed) =>
+                            void persistMemberSort(member.id, { reversed })
+                          }
+                        />
+                      </div>
                     </div>
                     <ul className="mt-3 space-y-3">
                       {memberTasks.map((task) => (

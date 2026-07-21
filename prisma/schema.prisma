@@ -8,12 +8,15 @@ datasource db {
 }
 
 model TeamMember {
-  id        String   @id @default(cuid())
-  name      String   @unique
+  id           String   @id @default(cuid())
+  name         String   @unique
   /// Soft-delete: inactive members stay linked to their tasks but can't be selected for new work.
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  tasks     Task[]
+  active       Boolean  @default(true)
+  /// Per-member task list sort: newest | priority | carried | status
+  sortBy       String   @default("newest")
+  sortReversed Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  tasks        Task[]
 }
 
 /// status: active | complete | obsolete

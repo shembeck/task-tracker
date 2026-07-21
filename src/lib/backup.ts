@@ -1,6 +1,7 @@
 import { existsSync, writeFileSync, rmSync } from "fs";
 import { prisma } from "./db";
-import { compareISODates, formatWeekLabel } from "./weeks";
+import { compareISODates, formatWeekLabel, weeksBetween } from "./weeks";
+import { compareTasks, normalizeSortBy } from "./sort-tasks";
 
 /*
  * One-way backup + restore against the Google Apps Script web app.
@@ -45,6 +46,8 @@ type SnapshotMember = {
   id: string;
   name: string;
   active: boolean;
+  sortBy?: string;
+  sortReversed?: boolean;
   createdAt: string;
 };
 
@@ -71,6 +74,8 @@ type DocWeek = {
       notes: string;
       status: string;
       priority?: string;
+      /** Weeks since original week; omitted when not carried. */
+      carriedWeeks?: number;
     }[];
   }[];
 };
@@ -103,6 +108,8 @@ async function buildSnapshot(): Promise<Snapshot> {
     id: m.id,
     name: m.name,
     active: m.active,
+    sortBy: m.sortBy,
+    sortReversed: m.sortReversed,
     createdAt: m.createdAt.toISOString(),
   }));
 
@@ -120,7 +127,12 @@ async function buildSnapshot(): Promise<Snapshot> {
   }));
 
   // Pre-group for the human Doc: weeks newest-first, members A→Z.
-  const weekMap = new Map<string, Map<string, DocWeek["members"][number]>>();
+  // Keep full tasks until sort so Doc order matches each member's sort prefs.
+  type DocTaskAccum = (typeof tasks)[number];
+  const weekMap = new Map<
+    string,
+    Map<string, { name: string; sortBy: string; sortReversed: boolean; tasks: DocTaskAccum[] }>
+  >();
   for (const t of tasks) {
     let week = weekMap.get(t.weekStart);
     if (!week) {
@@ -129,15 +141,15 @@ async function buildSnapshot(): Promise<Snapshot> {
     }
     let member = week.get(t.member.name);
     if (!member) {
-      member = { name: t.member.name, tasks: [] };
+      member = {
+        name: t.member.name,
+        sortBy: t.member.sortBy,
+        sortReversed: t.member.sortReversed,
+        tasks: [],
+      };
       week.set(t.member.name, member);
     }
-    member.tasks.push({
-      title: t.title,
-      notes: t.notes,
-      status: t.status,
-      priority: t.priority,
-    });
+    member.tasks.push(t);
   }
 
   const weeks: DocWeek[] = Array.from(weekMap.entries())
@@ -145,9 +157,31 @@ async function buildSnapshot(): Promise<Snapshot> {
     .map(([weekStart, memberMap]) => ({
       weekStart,
       label: formatWeekLabel(weekStart),
-      members: Array.from(memberMap.values()).sort((a, b) =>
-        a.name.localeCompare(b.name)
-      ),
+      members: Array.from(memberMap.values())
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((member) => {
+          const sortBy = normalizeSortBy(member.sortBy);
+          const sorted = [...member.tasks].sort((a, b) =>
+            compareTasks(a, b, sortBy, member.sortReversed)
+          );
+          return {
+            name: member.name,
+            tasks: sorted.map((t) => ({
+              title: t.title,
+              notes: t.notes,
+              status: t.status,
+              priority: t.priority,
+              ...(t.rolledFrom
+                ? {
+                    carriedWeeks: Math.max(
+                      1,
+                      weeksBetween(t.rolledFrom, t.weekStart)
+                    ),
+                  }
+                : {}),
+            })),
+          };
+        }),
     }));
 
   return {
@@ -374,6 +408,8 @@ async function applySnapshot(snapshot: Snapshot): Promise<void> {
           id: m.id,
           name: m.name,
           active: m.active !== false,
+          sortBy: normalizeSortBy(m.sortBy),
+          sortReversed: m.sortReversed === true,
           createdAt: new Date(m.createdAt),
         },
       })
