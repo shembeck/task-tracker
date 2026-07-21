@@ -17,12 +17,14 @@ model TeamMember {
 }
 
 /// status: active | complete | obsolete
+/// priority: high | medium | low
 /// weekStart: ISO date (YYYY-MM-DD) for the Monday of that week
 model Task {
   id         String     @id @default(cuid())
   title      String
   notes      String     @default("")
   status     String     @default("active")
+  priority   String     @default("medium")
   weekStart  String
   rolledFrom String?
   memberId   String

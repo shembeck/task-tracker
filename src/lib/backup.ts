@@ -53,6 +53,7 @@ type SnapshotTask = {
   title: string;
   notes: string;
   status: string;
+  priority?: string;
   weekStart: string;
   rolledFrom: string | null;
   memberId: string;
@@ -65,7 +66,12 @@ type DocWeek = {
   label: string;
   members: {
     name: string;
-    tasks: { title: string; notes: string; status: string }[];
+    tasks: {
+      title: string;
+      notes: string;
+      status: string;
+      priority?: string;
+    }[];
   }[];
 };
 
@@ -105,6 +111,7 @@ async function buildSnapshot(): Promise<Snapshot> {
     title: t.title,
     notes: t.notes,
     status: t.status,
+    priority: t.priority,
     weekStart: t.weekStart,
     rolledFrom: t.rolledFrom,
     memberId: t.memberId,
@@ -125,7 +132,12 @@ async function buildSnapshot(): Promise<Snapshot> {
       member = { name: t.member.name, tasks: [] };
       week.set(t.member.name, member);
     }
-    member.tasks.push({ title: t.title, notes: t.notes, status: t.status });
+    member.tasks.push({
+      title: t.title,
+      notes: t.notes,
+      status: t.status,
+      priority: t.priority,
+    });
   }
 
   const weeks: DocWeek[] = Array.from(weekMap.entries())
@@ -373,6 +385,8 @@ async function applySnapshot(snapshot: Snapshot): Promise<void> {
           title: t.title,
           notes: t.notes,
           status: t.status,
+          priority:
+            t.priority === "high" || t.priority === "low" ? t.priority : "medium",
           weekStart: t.weekStart,
           rolledFrom: t.rolledFrom,
           memberId: t.memberId,

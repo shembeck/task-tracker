@@ -5,6 +5,7 @@ import { pushBackup } from "@/lib/backup";
 import { weekKind } from "@/lib/weeks";
 
 const STATUSES = new Set(["active", "complete", "obsolete"]);
+const PRIORITIES = new Set(["high", "medium", "low"]);
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,6 +24,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     title?: string;
     notes?: string;
     status?: string;
+    priority?: string;
   } = {};
 
   if (typeof body?.status === "string") {
@@ -32,8 +34,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     updates.status = body.status;
   }
 
+  if (typeof body?.priority === "string") {
+    if (!PRIORITIES.has(body.priority)) {
+      return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
+    }
+    updates.priority = body.priority;
+  }
+
   const wantsContentEdit =
-    typeof body?.title === "string" || typeof body?.notes === "string";
+    typeof body?.title === "string" ||
+    typeof body?.notes === "string" ||
+    typeof body?.priority === "string";
 
   if (kind === "past" && wantsContentEdit) {
     return NextResponse.json(

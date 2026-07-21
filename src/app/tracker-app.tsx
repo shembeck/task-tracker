@@ -2,11 +2,74 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Task, TeamMember, WeekOption } from "@/lib/types";
+import type { Task, TaskPriority, TeamMember, WeekOption } from "@/lib/types";
 
-type DraftTask = { title: string; notes: string };
+type DraftTask = { title: string; notes: string; priority: TaskPriority };
 
-const emptyDraft = (): DraftTask => ({ title: "", notes: "" });
+const emptyDraft = (): DraftTask => ({
+  title: "",
+  notes: "",
+  priority: "medium",
+});
+
+const PRIORITIES: TaskPriority[] = ["high", "medium", "low"];
+
+const PRIORITY_LABEL: Record<TaskPriority, string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
+const PRIORITY_COLOR: Record<TaskPriority, string> = {
+  high: "var(--priority-high)",
+  medium: "var(--priority-medium)",
+  low: "var(--priority-low)",
+};
+
+function PrioritySelect({
+  value,
+  onChange,
+  disabled,
+  id,
+}: {
+  value: TaskPriority;
+  onChange: (priority: TaskPriority) => void;
+  disabled?: boolean;
+  id?: string;
+}) {
+  const color = PRIORITY_COLOR[value];
+  return (
+    <label className="inline-flex items-center gap-1.5">
+      <span
+        style={{ fontSize: "11px", lineHeight: 0 }}
+        className="font-bold uppercase tracking-wider text-[var(--ink-muted)]"
+      >
+        Priority
+      </span>
+      <select
+        id={id}
+        value={value}
+        disabled={disabled}
+        aria-label="Priority"
+        onChange={(e) => onChange(e.target.value as TaskPriority)}
+        style={{
+          color,
+          fontSize: "11px",
+          lineHeight: 1,
+          border: `1px solid ${color}`,
+          backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`,
+        }}
+        className="cursor-pointer rounded px-1.5 py-0.5 font-bold uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {PRIORITIES.map((p) => (
+          <option key={p} value={p} style={{ color: PRIORITY_COLOR[p] }}>
+            {PRIORITY_LABEL[p]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 export default function TrackerApp() {
   const router = useRouter();
@@ -187,7 +250,11 @@ export default function TrackerApp() {
     e.preventDefault();
     if (!memberId || !canAddTasks) return;
     const payload = drafts
-      .map((d) => ({ title: d.title.trim(), notes: d.notes.trim() }))
+      .map((d) => ({
+        title: d.title.trim(),
+        notes: d.notes.trim(),
+        priority: d.priority,
+      }))
       .filter((d) => d.title);
     if (payload.length === 0) {
       setError("Enter at least one task title");
@@ -204,6 +271,7 @@ export default function TrackerApp() {
             memberId,
             title: item.title,
             notes: item.notes,
+            priority: item.priority,
             weekStart,
           }),
         });
@@ -227,7 +295,12 @@ export default function TrackerApp() {
 
   async function patchTask(
     id: string,
-    body: { status?: string; title?: string; notes?: string }
+    body: {
+      status?: string;
+      title?: string;
+      notes?: string;
+      priority?: TaskPriority;
+    }
   ) {
     setError("");
     const res = await fetch(`/api/tasks/${id}`, {
@@ -442,8 +515,19 @@ export default function TrackerApp() {
                     key={index}
                     className="space-y-2 border-t border-[var(--line)] pt-4 first:border-0 first:pt-0"
                   >
-                    {drafts.length > 1 ? (
-                      <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <PrioritySelect
+                        value={draft.priority}
+                        disabled={!memberId}
+                        onChange={(priority) => {
+                          setDrafts((prev) =>
+                            prev.map((d, i) =>
+                              i === index ? { ...d, priority } : d
+                            )
+                          );
+                        }}
+                      />
+                      {drafts.length > 1 ? (
                         <button
                           type="button"
                           onClick={() =>
@@ -455,8 +539,8 @@ export default function TrackerApp() {
                         >
                           Remove
                         </button>
-                      </div>
-                    ) : null}
+                      ) : null}
+                    </div>
                     <div className="relative flex items-center gap-2">
                       <input
                         ref={index === 0 ? taskTitleRef : undefined}
@@ -674,12 +758,26 @@ export default function TrackerApp() {
                             >
                               <div className="flex gap-3">
                                 <div className="min-w-0 flex-1">
-                                  <p
-                                    style={{ fontSize: "11px", lineHeight: 1 }}
-                                    className="pt-1 font-bold uppercase tracking-wider text-[var(--ink-muted)]"
-                                  >
-                                    Task
-                                  </p>
+                                  <div className="flex items-center justify-between gap-2 pt-1">
+                                    <p
+                                      style={{ fontSize: "11px", lineHeight: 1 }}
+                                      className="font-bold uppercase tracking-wider text-[var(--ink-muted)]"
+                                    >
+                                      Task
+                                    </p>
+                                    <PrioritySelect
+                                      value={
+                                        task.priority === "high" ||
+                                        task.priority === "low"
+                                          ? task.priority
+                                          : "medium"
+                                      }
+                                      disabled={!canEditContent}
+                                      onChange={(priority) =>
+                                        patchTask(task.id, { priority })
+                                      }
+                                    />
+                                  </div>
                                   <p
                                     style={{ paddingLeft: "4px" }}
                                     className={`mt-1 text-sm leading-snug ${

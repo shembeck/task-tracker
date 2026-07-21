@@ -9,6 +9,8 @@ import {
   weekKind,
 } from "@/lib/weeks";
 
+const PRIORITIES = new Set(["high", "medium", "low"]);
+
 export async function GET(request: NextRequest) {
   const { moved } = await rolloverIncompleteTasks();
   if (moved > 0) {
@@ -40,6 +42,9 @@ export async function POST(request: NextRequest) {
   const memberId = typeof body?.memberId === "string" ? body.memberId : "";
   const title = typeof body?.title === "string" ? body.title.trim() : "";
   const notes = typeof body?.notes === "string" ? body.notes.trim() : "";
+  const priorityRaw =
+    typeof body?.priority === "string" ? body.priority.trim() : "medium";
+  const priority = PRIORITIES.has(priorityRaw) ? priorityRaw : "";
   const weekRaw = typeof body?.weekStart === "string" ? body.weekStart : "";
   const weekStart = weekRaw
     ? normalizeToWeekStart(weekRaw)
@@ -50,6 +55,10 @@ export async function POST(request: NextRequest) {
       { error: "memberId and title are required" },
       { status: 400 }
     );
+  }
+
+  if (!priority) {
+    return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
   }
 
   if (!isValidWeekStart(weekStart)) {
@@ -73,6 +82,7 @@ export async function POST(request: NextRequest) {
       memberId,
       title,
       notes,
+      priority,
       weekStart,
       status: "active",
     },

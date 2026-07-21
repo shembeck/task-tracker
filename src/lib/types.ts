@@ -7,11 +7,14 @@ export type TeamMember = {
 
 export type TaskStatus = "active" | "complete" | "obsolete";
 
+export type TaskPriority = "high" | "medium" | "low";
+
 export type Task = {
   id: string;
   title: string;
   notes: string;
   status: TaskStatus;
+  priority: TaskPriority;
   weekStart: string;
   rolledFrom: string | null;
   memberId: string;

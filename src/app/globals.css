@@ -40,6 +40,9 @@
   --danger: #e2665c;
   --danger-bg: #2b1412;
   --danger-border: #642f2b;
+  --priority-high: var(--danger);
+  --priority-medium: var(--warn);
+  --priority-low: var(--accent-500);
   --complete: var(--accent-500);
   --obsolete: var(--gray-500);
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
