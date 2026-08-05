@@ -170,34 +170,89 @@ function saveBackup(payload, environment) {
 
 /* ---------- Human-readable Doc archive (newest week on top) ---------- */
 
+/**
+ * DocumentApp copies character styles from the previous sibling when you
+ * appendParagraph / appendListItem. Always wipe the full run, then apply
+ * only the styles we want.
+ *
+ * opts.heading: if true, only clear italic/strike/underline/color so the
+ * paragraph heading size/weight stay intact.
+ */
+function resetInheritedStyles_(el, opts) {
+  opts = opts || {};
+  var text = el.editAsText();
+  var len = text.getText().length;
+  if (len === 0) return text;
+  var end = len - 1;
+
+  text.setItalic(0, end, opts.italic === true);
+  text.setUnderline(0, end, false);
+  text.setStrikethrough(0, end, opts.strikethrough === true);
+  text.setForegroundColor(0, end, opts.color || "#000000");
+  try {
+    text.setBackgroundColor(0, end, null);
+  } catch (err) {
+    /* some Docs builds reject null background */
+  }
+  try {
+    text.setLinkUrl(0, end, null);
+  } catch (err2) {
+    /* ignore */
+  }
+
+  if (opts.heading) {
+    return text;
+  }
+
+  text.setBold(0, end, opts.bold === true);
+  if (opts.fontSize != null) {
+    text.setFontSize(0, end, opts.fontSize);
+  } else {
+    try {
+      text.setFontSize(0, end, null);
+    } catch (err3) {
+      text.setFontSize(0, end, 11);
+    }
+  }
+  return text;
+}
+
 function renderDoc(payload) {
   var doc = DocumentApp.getActiveDocument();
   var body = doc.getBody();
   body.clear();
 
-  body
-    .appendParagraph("Weekly Tasks")
-    .setHeading(DocumentApp.ParagraphHeading.TITLE);
+  var title = body.appendParagraph("Weekly Tasks");
+  title.setHeading(DocumentApp.ParagraphHeading.TITLE);
+  resetInheritedStyles_(title, { heading: true });
 
   var weeks = payload.weeks || [];
   if (weeks.length === 0) {
-    body.appendParagraph("No tasks logged yet.").setItalic(true);
+    var empty = body.appendParagraph("No tasks logged yet.");
+    empty.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    resetInheritedStyles_(empty, { italic: true, color: "#5a6b62", fontSize: 11 });
   } else {
     weeks.forEach(function (week) {
-      body
-        .appendParagraph(week.label)
-        .setHeading(DocumentApp.ParagraphHeading.HEADING1);
+      var weekHeading = body.appendParagraph(week.label);
+      weekHeading.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+      resetInheritedStyles_(weekHeading, { heading: true });
 
       var members = week.members || [];
       if (members.length === 0) {
-        body.appendParagraph("No tasks this week.").setItalic(true);
+        var noTasks = body.appendParagraph("No tasks this week.");
+        noTasks.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+        resetInheritedStyles_(noTasks, {
+          italic: true,
+          color: "#5a6b62",
+          fontSize: 11,
+        });
         return;
       }
 
       members.forEach(function (member) {
-        body
-          .appendParagraph(member.name)
-          .setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        var memberHeading = body.appendParagraph(member.name);
+        memberHeading.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        resetInheritedStyles_(memberHeading, { heading: true });
 
         (member.tasks || []).forEach(function (task) {
           var priority =
@@ -212,6 +267,8 @@ function renderDoc(payload) {
               : task.priority === "low"
                 ? "#14b58d"
                 : "#e3a548";
+          var done =
+            task.status === "complete" || task.status === "obsolete";
           var suffix =
             task.status === "complete"
               ? "  \u2713 done"
@@ -220,37 +277,62 @@ function renderDoc(payload) {
                 : "";
           var label = "[" + priority + "] ";
           var item = body.appendListItem(label + task.title + suffix);
+          item.setHeading(DocumentApp.ParagraphHeading.NORMAL);
           item.setGlyphType(DocumentApp.GlyphType.BULLET);
-          var text = item.editAsText();
-          // appendListItem inherits styles from the previous list item — always
-          // set strikethrough explicitly so active tasks don't stay struck.
-          text.setStrikethrough(
-            task.status === "complete" || task.status === "obsolete"
-          );
-          text.setForegroundColor(0, label.length - 1, priorityColor);
+          var text = resetInheritedStyles_(item, {
+            strikethrough: done,
+            fontSize: 11,
+            color: "#000000",
+          });
+          // Color only the [Priority] prefix after the full-run reset.
+          if (label.length > 0) {
+            text.setForegroundColor(0, label.length - 1, priorityColor);
+          }
+
           if (task.carriedWeeks) {
-            var weeks = Number(task.carriedWeeks);
-            var carriedLabel = "Carried over · " + weeks + "w";
+            var carriedWeeks = Number(task.carriedWeeks);
+            var carriedLabel = "Carried over · " + carriedWeeks + "w";
             var carried = body.appendParagraph(carriedLabel);
+            carried.setHeading(DocumentApp.ParagraphHeading.NORMAL);
             carried.setIndentStart(36);
             carried.setIndentFirstLine(36);
             var carriedColor =
-              weeks >= 3 ? "#e2665c" : weeks === 2 ? "#e3a548" : "#6c7f7a";
-            carried
-              .editAsText()
-              .setStrikethrough(false)
-              .setForegroundColor(carriedColor)
-              .setFontSize(9);
+              carriedWeeks >= 3
+                ? "#e2665c"
+                : carriedWeeks === 2
+                  ? "#e3a548"
+                  : "#6c7f7a";
+            resetInheritedStyles_(carried, {
+              color: carriedColor,
+              fontSize: 9,
+            });
           }
           if (task.notes) {
-            var note = body.appendParagraph(task.notes);
+            var notePrefix = "NOTE ";
+            var note = body.appendParagraph(notePrefix + task.notes);
+            note.setHeading(DocumentApp.ParagraphHeading.NORMAL);
             note.setIndentStart(36);
             note.setIndentFirstLine(36);
-            note
-              .editAsText()
-              .setStrikethrough(false)
-              .setForegroundColor("#5a6b62")
-              .setItalic(true);
+            var noteText = resetInheritedStyles_(note, {
+              italic: true,
+              color: "#3d4744",
+              fontSize: 11,
+            });
+            // Label: muted gray, bold, not italic. Body stays darker gray italic.
+            noteText
+              .setForegroundColor(0, notePrefix.length - 1, "#6c7f7a")
+              .setBold(0, notePrefix.length - 1, true)
+              .setItalic(0, notePrefix.length - 1, false);
+            if (noteText.getText().length > notePrefix.length) {
+              noteText
+                .setForegroundColor(
+                  notePrefix.length,
+                  noteText.getText().length - 1,
+                  "#3d4744"
+                )
+                .setItalic(notePrefix.length, noteText.getText().length - 1, true)
+                .setBold(notePrefix.length, noteText.getText().length - 1, false);
+            }
           }
         });
       });
@@ -260,7 +342,8 @@ function renderDoc(payload) {
   var stamp = body.appendParagraph(
     "Last updated " + formatStamp(payload.generatedAt)
   );
-  stamp.editAsText().setForegroundColor("#8a8f8c").setFontSize(8);
+  stamp.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  resetInheritedStyles_(stamp, { color: "#8a8f8c", fontSize: 8 });
 
   doc.saveAndClose();
 }
